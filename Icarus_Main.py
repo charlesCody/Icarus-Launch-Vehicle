@@ -1,6 +1,7 @@
 #Main file for the Icarus launch vehicle. 
 #Import Declarations
 import numpy as np 
+import matplotlib.pyplot as plt 
 
 #Physical Constants
 r_Earth = 6378000
@@ -10,8 +11,8 @@ g0 = 9.8066
 #Functions
 def earth_Gravity(position):
     r = position[2] + r_Earth
-    g0 = G_parameter_Earth / (r * r) 
-    return g0
+    g = G_parameter_Earth / (r * r) 
+    return g
 
 def standard_Atmosphere(position):
     if position[2] < 11000:
@@ -33,18 +34,19 @@ def atmosphere_Pressure_to_Density(position):
 
 def drag_Force(drag_Coefficient, cross_Sectional_Area, velocity, position):
     air_Density = atmosphere_Pressure_to_Density(position)
-    drag = 0.5 * drag_Coefficient * air_Density * cross_Sectional_Area * velocity ** 2
+    drag = 0.5 * drag_Coefficient * air_Density * cross_Sectional_Area * velocity[2] ** 2
     return drag
 
 def dynamic_Pressure(air_Density, velocity):
     Q = 0.5 * air_Density * velocity ** 2
     return Q
 
-#Simulation Settings
+#Simulation Initialization
 t_Initial = 0
 position_Initial = np.zeros(3)
-velocity_Initial = 0 
-acceleration_Initial = 0
+velocity_Initial = np.zeros(3) 
+acceleration_Initial = np.zeros(3)
+g = np.zeros(3)
 
 #Vehicle Configuration
 mass_Propellant = 550000
@@ -65,41 +67,46 @@ total_Mass_flow = engine_Mass_Flow * num_Engines
 
 #Simulation Setup
 t = t_Initial
-t_Max = 400
+t_Max = 100
 dt = 0.1
 position = position_Initial
 velocity = velocity_Initial
 acceleration = acceleration_Initial
-g = g0
+g[2] = g0
 readout_Array = np.array([["Time Elapsed (s)", "Position", "Velocity", "Acceleration"]])
 
 #Main Program Loop
-while t <= t_Max:
-    g = earth_Gravity(position)
+while t <= t_Max and position[2] >= 0:
+    g[2] = earth_Gravity(position)
     drag = drag_Force(drag_Coefficient, cross_Sectional_Area, velocity, position)
     
-    acceleration = (thrust_Total - drag)/ mass
-    acceleration -= g
+    acceleration[2] = (thrust_Total - drag)/ mass
+    acceleration[2] -= g[2]
     
-    current_Readout = np.array([[str(t) + " s", str(position[2]), str(velocity), str(acceleration)]])
+    current_Readout = np.array([[str(t), str(position[2]), str(velocity[2]), str(acceleration[2])]])
     readout_Array = np.append(readout_Array, current_Readout, axis = 0)
     
     t += dt
-    position[2] += (velocity * dt)
-    velocity += (acceleration * dt)
+    position[2] += (velocity[2] * dt)
+    velocity[2] += (acceleration[2] * dt)
     mass -= (total_Mass_flow * dt)
     
     if mass_Propellant <= 0:
         total_Mass_Flow = 0
     else:
         pass
-   
-    if position[2] <= 0 and t > 2:
-        break
-    else:
-        pass
-    
-for row in readout_Array:
-    print(" ".join(f"{col:20}" for col in row))
+     
+#for row in readout_Array:
+    #print(" ".join(f"{col:20}" for col in row))
 
+t_Plot = readout_Array[1:, 0].astype(float)
+z_Plot = readout_Array[1:, 1].astype(float)
+vz_Plot = readout_Array[1:, 2].astype(float)
+az_Plot = readout_Array[1:, 3].astype(float)
 
+plt.plot(t_Plot, z_Plot, label = "z-position")
+plt.plot(t_Plot, vz_Plot, label = "z-velocity")
+plt.plot(t_Plot, az_Plot, label = "z-acceleration")
+plt.legend()
+plt.grid()
+plt.show()
