@@ -2,6 +2,7 @@
 #Import Declarations
 import numpy as np 
 import matplotlib.pyplot as plt 
+from Icarus_Interface import Icarus_Interface 
 
 #Physical Constants
 r_Earth = 6378000
@@ -77,18 +78,20 @@ readout_Array = np.array([["Time Elapsed (s)", "Position", "Velocity", "Accelera
 
 #Main Program Loop
 while t <= t_Max and position[2] >= 0:
+    velocity_half = velocity + acceleration * 0.5 * dt
+    
     g[2] = earth_Gravity(position)
     drag = drag_Force(drag_Coefficient, cross_Sectional_Area, velocity, position)
-    
-    acceleration[2] = (thrust_Total - drag)/ mass
-    acceleration[2] -= g[2]
+    position += (velocity_half * dt)
     
     current_Readout = np.array([[str(t), str(position[2]), str(velocity[2]), str(acceleration[2])]])
     readout_Array = np.append(readout_Array, current_Readout, axis = 0)
     
     t += dt
-    position[2] += (velocity[2] * dt)
-    velocity[2] += (acceleration[2] * dt)
+    acceleration[2] = (thrust_Total - drag)/ mass
+    acceleration -= g
+    
+    velocity = velocity_half + (acceleration * 0.5 * dt)
     mass -= (total_Mass_flow * dt)
     
     if mass_Propellant <= 0:
@@ -99,14 +102,6 @@ while t <= t_Max and position[2] >= 0:
 #for row in readout_Array:
     #print(" ".join(f"{col:20}" for col in row))
 
-t_Plot = readout_Array[1:, 0].astype(float)
-z_Plot = readout_Array[1:, 1].astype(float)
-vz_Plot = readout_Array[1:, 2].astype(float)
-az_Plot = readout_Array[1:, 3].astype(float)
+icarus_Interface = Icarus_Interface(readout_Array)
+icarus_Interface.kinematic_plot(readout_Array)
 
-plt.plot(t_Plot, z_Plot, label = "z-position")
-plt.plot(t_Plot, vz_Plot, label = "z-velocity")
-plt.plot(t_Plot, az_Plot, label = "z-acceleration")
-plt.legend()
-plt.grid()
-plt.show()
