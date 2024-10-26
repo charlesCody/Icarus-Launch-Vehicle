@@ -43,27 +43,36 @@ def dynamic_Pressure(air_Density, state):
     Q = 0.5 * air_Density * state[2,1] ** 2
     return Q
 
-def controller(Controlled_State, state, velocity_Target, error_history, proportional_Gain, integral_Gain, derivative_Gain):
+def controller(Controlled_State, state, velocity_Target, error, error_history, error_integral, proportional_Gain, integral_Gain, derivative_Gain):
     if Controlled_State:
         global throttle
-        try:
-            proportional_Response = proportional_Gain * (error_history[-1])
-        except:
-            proportional_Response = 1
+        integrator = True
+        proportional_Response = proportional_Gain * (error_history[-1]) if len(error_history) > 0 else 0
+
+        if integrator:
+            
+            error_integral = np.append(error_integral, error_history[-1])
+        integral_Response = integral_Gain * np.sum(error_integral)
         
-        integral_Response = integral_Gain * np.sum(error_history)
-        try:
+        if len(error_history) > 1:
             derivative_Response = derivative_Gain * error_history[-1] - error_history[-2]
-        except:
+        else:
             derivative_Response = 0
+            
         throttle = proportional_Response + integral_Response + derivative_Response
+        throttle = max(throttle_Min, min(throttle_Max, throttle))
+        
         if throttle > throttle_Max:
             throttle = throttle_Max
         elif throttle < throttle_Min: 
             throttle = throttle_Min
+            
+        if (throttle == throttle_Max or throttle == throttle_Min) and np.sign(error) == np.sign(throttle):
+            integrator = False
+            
     else:
         pass
-    print(proportional_Response, integral_Response, derivative_Response)
+    #print(proportional_Response, integral_Response, derivative_Response, throttle)
     return throttle
     
 #Simulation Initialization
@@ -89,17 +98,17 @@ ignited_Engines = num_Engines
 thrust_Total = thrust_Engine * num_Engines
 total_Mass_flow = engine_Mass_Flow * num_Engines
 throttle = 1
-throttle_Min = 0.4
+throttle_Min = 0.2
 throttle_Max = 1
 Controlled_State = True
 proportional_Gain = 0.05
 integral_Gain = 0.1
-derivative_Gain = 0.3
+derivative_Gain = 1
 error_history = np.array([])
-
+error_integral = np.array([])
 #Simulation Setup
 t = t_Initial
-t_Max = 280
+t_Max = 1000
 dt = 0.1
 state = state_Initial
 
@@ -109,6 +118,8 @@ velocity_Target = np.array([0,0,1000])
 
 #Main Program Loop
 while t <= t_Max and state[2,0] >= 0:
+    error = velocity_Target[2] - state[2,1]
+    error_history = np.append(error_history, error)
     velocity_half = state[:,1] + state[:,2] * 0.5 * dt
 
     g[2] = earth_Gravity(state)
@@ -118,22 +129,24 @@ while t <= t_Max and state[2,0] >= 0:
     readout_Array = np.append(readout_Array, current_Readout, axis = 0)
     
     t += dt
-    throttle = controller(Controlled_State, state, velocity_Target, error_history, proportional_Gain, integral_Gain, derivative_Gain)
+    throttle = controller(Controlled_State, state, velocity_Target, error, error_history, error_integral, proportional_Gain, integral_Gain, derivative_Gain)
     state[2,2] = (throttle * thrust_Total - drag)/ mass
     state[2] -= g
     
     state[:,1] = velocity_half + (state[:,2] * 0.5 * dt)
-    mass -= (total_Mass_flow * dt)
+    Mass_flow = total_Mass_flow * throttle
+    mass -= (Mass_flow * dt)
+    mass_Propellant -= (Mass_flow * dt)
     
     if mass_Propellant <= 0:
         total_Mass_Flow = 0
     else:
         pass
-    #print(throttle, state[2,1], state[2,2], velocity_half[2], state[2,0])
-    time.sleep(0.05)
-    error_history = np.append(error_history, velocity_Target[2] - state[2,1])
-for row in readout_Array:
-    print(" ".join(f"{col:20}" for col in row))
+    print(t, throttle, state[2,1], state[2,2], velocity_half[2], state[2,0], mass_Propellant)
+    #time.sleep(0.05)
+    
+#for row in readout_Array:
+    #print(" ".join(f"{col:20}" for col in row))
 
 
 icarus_Interface = Icarus_Interface(readout_Array)
