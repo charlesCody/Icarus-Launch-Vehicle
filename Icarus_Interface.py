@@ -13,7 +13,7 @@ class Icarus_Interface:
         az_Plot = readout_Array[1:, 3].astype(float)
 
         #Plotting Telementry
-        plt.plot(t_Plot, z_Plot, label = "z-position")
+        #plt.plot(t_Plot, z_Plot, label = "z-position")
         plt.plot(t_Plot, vz_Plot, label = "z-velocity")
         plt.plot(t_Plot, az_Plot, label = "z-acceleration")
         plt.legend()
